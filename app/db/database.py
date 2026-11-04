@@ -1,12 +1,15 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from app.core.config import settings
 
+connect_args = {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
 
 # Database configuration
-DATABASE_URL = "sqlite:///./test.db"  # Replace with your actual database URL
 engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
+    settings.DATABASE_URL,
+    connect_args=connect_args
 )
 SessionLocal = sessionmaker(
     bind=engine,
