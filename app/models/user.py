@@ -1,8 +1,7 @@
+import uuid
 from datetime import datetime, timezone
-
 from sqlalchemy import DateTime, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
-
 from app.db.database import Base
 
 
@@ -11,8 +10,7 @@ class User(Base):
 
     __tablename__ = "users"
 
-    id: Mapped[Uuid] = mapped_column(
-        Uuid(as_uuid=True), primary_key=True, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
 
     full_name: Mapped[str] = mapped_column(
         String(150), unique=True, nullable=False)
