@@ -398,6 +398,52 @@ logic tests pass the isolated test session directly.
 
 ## Deployment
 
+### Railway with Docker
+
+The root `Dockerfile` is detected by Railway automatically. Connect the
+repository and deploy from its root; no `railway.json`, Docker Compose file,
+or custom build command is required. The container starts Uvicorn on
+Railway's `PORT` environment variable (falling back to `8000` locally).
+
+In the Railway service's **Variables**, configure at least:
+
+```text
+SECRET_KEY=<generated secure value>
+DEBUG=false
+ENVIRONMENT=production
+```
+
+For durable data, use a Railway PostgreSQL service and set `DATABASE_URL` to
+the connection URL Railway provides. If you choose SQLite, add a Railway
+Volume mounted at `/data` and set:
+
+```text
+DATABASE_URL=sqlite:////data/credisure.db
+```
+
+Without a persistent volume, SQLite data stored in the container can be lost
+on redeploy or restart. SQLite is also not a good fit for multiple app replicas
+sharing write traffic; use PostgreSQL in that case. The API creates missing
+tables at startup. Provision an administrator as a one-off command with
+`python -m app.scripts.create_admin`; do not place admin credentials in the
+Docker image or source repository. If demo users are needed, run the seed
+script explicitly and set `ALLOW_DEMO_SEEDING=true` only for that operation.
+
+The service health-check path is `/api/v1/health`. After deployment, Railway
+provides the public URL; append `/docs` for Swagger UI if it is enabled.
+
+To build and run the same image locally (requires Docker):
+
+```bash
+docker build -t creditsure-api .
+docker run --rm -p 8000:8000 --env-file .env creditsure-api
+```
+
+`.dockerignore` keeps local environment files, virtual environments, tests, and
+SQLite files out of the image. Configure secrets separately in Railway.
+
+### Other deployment notes
+
 1. Install the pinned dependencies from `requirements.txt`.
 2. Set `SECRET_KEY`, `DATABASE_URL`, and token settings through the platform's
    environment/secret configuration. Keep `DEBUG=false`.
