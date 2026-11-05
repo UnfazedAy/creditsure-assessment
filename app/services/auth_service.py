@@ -52,12 +52,16 @@ def register_user(db: Session, user_data: UserCreate) -> User:
 
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email is already registered"
-        )
+
+        if "UNIQUE constraint failed: users.email" in str(exc.orig):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email is already registered",
+            ) from exc
+
+        raise
 
     db.refresh(new_user)
     return new_user

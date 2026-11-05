@@ -11,7 +11,8 @@ from app.services.auth_service import (
     register_user,
     authenticate_user,
 )
-
+from app.dependencies.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter(
     prefix="/auth",
@@ -47,3 +48,15 @@ def login(
         refresh_token=token_pair["refresh_token"],
         token_type="bearer"
     )
+
+@router.get(
+    "/me",
+    response_model=UserResponse
+)
+def get_my_profile(
+    current_user: Annotated[
+        User,
+        Depends(get_current_user)
+    ]
+):
+    return current_user
