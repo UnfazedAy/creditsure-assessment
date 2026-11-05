@@ -205,6 +205,20 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Local application databases and SQLite sidecar files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+
+# Ensure the safe template remains versioned
+!.env.example
+
 # Ruff stuff:
 .ruff_cache/
 

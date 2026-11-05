@@ -4,11 +4,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import settings
+from app.core.exceptions import register_exception_handlers
 from app.db.database import Base, engine
 from app.models import user
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.routers import auth, dashboard, health, users
-from app.core.exceptions import register_exception_handlers
 
 
 logging.basicConfig(
@@ -25,9 +26,10 @@ async def lifespan(app: FastAPI):
 
 # Initialize FastAPI application
 app = FastAPI(
-    title="CrediSure Dashboard API",
+    title=settings.APP_NAME,
     description="Backend API for authentication, user management, and dashboard statistics.",
     version="1.0.0",
+    debug=settings.DEBUG,
     lifespan=lifespan,
 )
 
