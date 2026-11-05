@@ -502,7 +502,7 @@ python -m pytest tests/test_health.py -v
 python -m pytest tests/test_scripts.py -v
 ```
 
-Run coverage:
+Run coverage with report:
 
 ```bash
 python -m pytest tests/ --cov=app --cov-report=term-missing
