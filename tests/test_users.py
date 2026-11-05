@@ -15,7 +15,10 @@ def test_admin_can_list_users(
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    assert body["detail"] == "Users retrieved successfully"
+    data = body["data"]
 
     assert data["total"] == 2
     assert len(data["items"]) == 2
@@ -32,12 +35,18 @@ def test_normal_user_cannot_list_users(
     )
 
     assert response.status_code == 403
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "Admin access required"
 
 
 def test_unauthenticated_user_cannot_list_users(client):
     response = client.get("/api/v1/users")
 
     assert response.status_code == 401
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 def test_search_users(
@@ -64,7 +73,10 @@ def test_search_users(
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    assert body["detail"] == "Users retrieved successfully"
+    data = body["data"]
 
     assert data["total"] == 1
     assert data["items"][0]["email"] == "john@example.com"
@@ -88,7 +100,8 @@ def test_search_is_case_insensitive(
     )
 
     assert response.status_code == 200
-    assert response.json()["total"] == 1
+    assert response.json()["success"] is True
+    assert response.json()["data"]["total"] == 1
 
 
 def test_filter_active_users(
@@ -115,7 +128,9 @@ def test_filter_active_users(
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    data = body["data"]
 
     # Admin + active user
     assert data["total"] == 2
@@ -144,8 +159,9 @@ def test_filter_inactive_users(
     )
 
     assert response.status_code == 200
-    assert response.json()["total"] == 1
-    assert response.json()["items"][0]["is_active"] is False
+    assert response.json()["success"] is True
+    assert response.json()["data"]["total"] == 1
+    assert response.json()["data"]["items"][0]["is_active"] is False
 
 
 def test_filter_by_role(
@@ -161,8 +177,9 @@ def test_filter_by_role(
     )
 
     assert response.status_code == 200
-    assert response.json()["total"] == 1
-    assert response.json()["items"][0]["role"] == "admin"
+    assert response.json()["success"] is True
+    assert response.json()["data"]["total"] == 1
+    assert response.json()["data"]["items"][0]["role"] == "admin"
 
 
 def test_pagination(
@@ -184,7 +201,9 @@ def test_pagination(
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    data = body["data"]
 
     # 12 regular users + admin
     assert data["total"] == 13
@@ -208,6 +227,9 @@ def test_invalid_pagination(
     )
 
     assert response.status_code == 422
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["errors"]
 
 
 def test_get_user_by_uuid(
@@ -222,7 +244,9 @@ def test_get_user_by_uuid(
     )
 
     assert response.status_code == 200
-    assert response.json()["id"] == str(normal_user.id)
+    assert response.json()["success"] is True
+    assert response.json()["detail"] == "User retrieved successfully"
+    assert response.json()["data"]["id"] == str(normal_user.id)
 
 
 def test_get_user_invalid_uuid(
@@ -236,6 +260,8 @@ def test_get_user_invalid_uuid(
     )
 
     assert response.status_code == 422
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
 
 
 def test_get_nonexistent_user(
@@ -249,6 +275,9 @@ def test_get_nonexistent_user(
     )
 
     assert response.status_code == 404
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "User not found"
 
 
 def test_admin_can_deactivate_user(
@@ -264,7 +293,9 @@ def test_admin_can_deactivate_user(
     )
 
     assert response.status_code == 200
-    assert response.json()["is_active"] is False
+    assert response.json()["success"] is True
+    assert response.json()["detail"] == "User updated successfully"
+    assert response.json()["data"]["is_active"] is False
 
 
 def test_admin_cannot_deactivate_self(
@@ -279,6 +310,9 @@ def test_admin_cannot_deactivate_self(
     )
 
     assert response.status_code == 400
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "You cannot deactivate your own account"
 
 
 def test_normal_user_cannot_update_user(
@@ -294,3 +328,5 @@ def test_normal_user_cannot_update_user(
     )
 
     assert response.status_code == 403
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None

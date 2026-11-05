@@ -5,7 +5,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.schemas.common import APIErrorResponse
+
 logger = logging.getLogger(__name__)
+
 
 def register_exception_handlers(app: FastAPI):
 
@@ -16,10 +19,10 @@ def register_exception_handlers(app: FastAPI):
     ):
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "success": False,
-                "message": exc.detail,
-            },
+            content=APIErrorResponse(
+                success=False,
+                detail=exc.detail if isinstance(exc.detail, str) else "Request failed",
+            ).model_dump(mode="json", exclude_none=True) | {"data": None},
             headers=exc.headers
         )
 
@@ -30,19 +33,19 @@ def register_exception_handlers(app: FastAPI):
     ):
         errors = [
             {
-                "field": ".".join(map(str, err["loc"])),
-                "message": err["msg"]
+                "field": ".".join(map(str, error["loc"])),
+                "message": error["msg"],
             }
-            for err in exc.errors()
+            for error in exc.errors()
         ]
 
         return JSONResponse(
             status_code=422,
-            content={
-                "success": False,
-                "message": "Validation failed",
-                "errors": errors
-            }
+            content=APIErrorResponse(
+                success=False,
+                detail="Request validation failed",
+                errors=errors,
+            ).model_dump(mode="json", exclude_none=True) | {"data": None},
         )
 
     @app.exception_handler(Exception)
@@ -58,8 +61,8 @@ def register_exception_handlers(app: FastAPI):
 
         return JSONResponse(
             status_code=500,
-            content={
-                "success": False,
-                "message": "Internal server error"
-            }
+            content=APIErrorResponse(
+                success=False,
+                detail="Internal server error",
+            ).model_dump(mode="json", exclude_none=True) | {"data": None},
         )

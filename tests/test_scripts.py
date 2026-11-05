@@ -91,14 +91,18 @@ def test_admin_provisioning_is_idempotent_and_authenticates(
     )
 
     assert response.status_code == 200
-    assert response.json()["access_token"]
+    body = response.json()
+    assert body["success"] is True
+    assert body["detail"] == "Login successful"
+    assert body["data"]["access_token"]
     overview = client.get(
         "/api/v1/dashboard/overview",
         headers={
-            "Authorization": f"Bearer {response.json()['access_token']}",
+            "Authorization": f"Bearer {body['data']['access_token']}",
         },
     )
     assert overview.status_code == 200
+    assert overview.json()["success"] is True
 
     admin = db_session.scalar(
         select(User).where(User.email == "admin@example.com")

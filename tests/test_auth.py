@@ -13,7 +13,10 @@ def test_register_user(client):
 
     assert response.status_code == 201
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    assert body["detail"] == "User registered successfully"
+    data = body["data"]
 
     assert data["full_name"] == "John Doe"
     assert data["email"] == "john@example.com"
@@ -40,6 +43,9 @@ def test_register_duplicate_email(client, normal_user):
     )
 
     assert response.status_code == 409
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "Email is already registered"
 
 
 def test_register_invalid_email(client):
@@ -53,6 +59,12 @@ def test_register_invalid_email(client):
     )
 
     assert response.status_code == 422
+    error = response.json()
+    assert error["success"] is False
+    assert error["data"] is None
+    assert error["detail"] == "Request validation failed"
+    assert error["errors"]
+    assert "not-an-email" not in str(error)
 
 
 def test_register_short_password(client):
@@ -66,6 +78,11 @@ def test_register_short_password(client):
     )
 
     assert response.status_code == 422
+    error = response.json()
+    assert error["success"] is False
+    assert error["data"] is None
+    assert error["errors"]
+    assert "123" not in str(error)
 
 
 def test_login_success(client, normal_user):
@@ -79,10 +96,18 @@ def test_login_success(client, normal_user):
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    assert body["detail"] == "Login successful"
+    data = body["data"]
 
     assert "access_token" in data
+    assert "refresh_token" in data
     assert data["token_type"] == "bearer"
+
+    from app.core.security import decode_token
+    assert decode_token(data["access_token"])["type"] == "access"
+    assert decode_token(data["refresh_token"])["type"] == "refresh"
 
 
 def test_login_wrong_password(client, normal_user):
@@ -95,6 +120,10 @@ def test_login_wrong_password(client, normal_user):
     )
 
     assert response.status_code == 401
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "Invalid email or password"
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 def test_login_nonexistent_user(client):
@@ -107,6 +136,9 @@ def test_login_nonexistent_user(client):
     )
 
     assert response.status_code == 401
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "Invalid email or password"
 
 
 def test_inactive_user_cannot_login(client, user_factory):
@@ -124,6 +156,9 @@ def test_inactive_user_cannot_login(client, user_factory):
     )
 
     assert response.status_code == 403
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "Account is inactive"
 
 
 def test_get_current_user(
@@ -137,14 +172,20 @@ def test_get_current_user(
     )
 
     assert response.status_code == 200
-    assert response.json()["id"] == str(normal_user.id)
-    assert response.json()["email"] == normal_user.email
+    body = response.json()
+    assert body["success"] is True
+    assert body["detail"] == "User retrieved successfully"
+    assert body["data"]["id"] == str(normal_user.id)
+    assert body["data"]["email"] == normal_user.email
 
 
 def test_get_current_user_without_token(client):
     response = client.get("/api/v1/auth/me")
 
     assert response.status_code == 401
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.headers["www-authenticate"] == "Bearer"
 
 
 def test_get_current_user_invalid_token(client):
@@ -156,6 +197,8 @@ def test_get_current_user_invalid_token(client):
     )
 
     assert response.status_code == 401
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
 
 
 def test_inactive_user_cannot_access_profile(
@@ -174,3 +217,6 @@ def test_inactive_user_cannot_access_profile(
     )
 
     assert response.status_code == 403
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+    assert response.json()["detail"] == "Account is inactive"

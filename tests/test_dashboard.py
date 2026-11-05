@@ -44,7 +44,10 @@ def test_dashboard_statistics(
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    assert body["detail"] == "Dashboard overview retrieved successfully"
+    data = body["data"]
 
     assert data["total_users"] == 4
     assert data["active_users"] == 3
@@ -66,7 +69,9 @@ def test_dashboard_empty_database(
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
+    assert body["success"] is True
+    data = body["data"]
 
     assert data["total_users"] == 1
     assert data["active_users"] == 1
@@ -79,6 +84,8 @@ def test_dashboard_requires_authentication(client):
     )
 
     assert response.status_code == 401
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
 
 
 def test_normal_user_cannot_access_dashboard(
@@ -92,3 +99,32 @@ def test_normal_user_cannot_access_dashboard(
     )
 
     assert response.status_code == 403
+    assert response.json()["success"] is False
+    assert response.json()["data"] is None
+
+
+def test_unhandled_error_uses_safe_response_envelope(
+    client,
+    admin_user,
+    auth_headers,
+    monkeypatch,
+):
+    def raise_error(_db):
+        raise RuntimeError("private implementation detail")
+
+    monkeypatch.setattr(
+        "app.routers.dashboard.get_dashboard_overview",
+        raise_error,
+    )
+    response = client.get(
+        "/api/v1/dashboard/overview",
+        headers=auth_headers(admin_user),
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "success": False,
+        "data": None,
+        "detail": "Internal server error",
+    }
+    assert "private implementation detail" not in response.text

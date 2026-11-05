@@ -2,12 +2,13 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.dependencies.auth import require_admin
 from app.models.user import User
+from app.schemas.common import APIResponse, error_responses
 from app.schemas.user import (
     PaginatedUsersResponse,
     UserResponse,
@@ -31,7 +32,8 @@ AdminUser = Annotated[User, Depends(require_admin)]
 
 @router.get(
     "",
-    response_model=PaginatedUsersResponse
+    response_model=APIResponse[PaginatedUsersResponse],
+    responses=error_responses(401, 403, 422, 500),
 )
 def get_users(
     db: DbSession,
@@ -45,31 +47,41 @@ def get_users(
     is_active: bool | None = None,
     role: Literal["user", "admin"] | None = None
 ):
-    return list_users(
-        db=db,
-        page=page,
-        limit=limit,
-        search=search,
-        is_active=is_active,
-        role=role
+    return APIResponse(
+        success=True,
+        data=list_users(
+            db=db,
+            page=page,
+            limit=limit,
+            search=search,
+            is_active=is_active,
+            role=role,
+        ),
+        detail="Users retrieved successfully",
     )
 
 
 @router.get(
     "/{user_id}",
-    response_model=UserResponse
+    response_model=APIResponse[UserResponse],
+    responses=error_responses(401, 403, 404, 422, 500),
 )
 def get_user(
     user_id: UUID,
     db: DbSession,
     admin: AdminUser
 ):
-    return get_user_by_id(db, user_id)
+    return APIResponse(
+        success=True,
+        data=get_user_by_id(db, user_id),
+        detail="User retrieved successfully",
+    )
 
 
 @router.patch(
     "/{user_id}",
-    response_model=UserResponse
+    response_model=APIResponse[UserResponse],
+    responses=error_responses(400, 401, 403, 404, 422, 500),
 )
 def update_user(
     user_id: UUID,
@@ -77,9 +89,13 @@ def update_user(
     db: DbSession,
     admin: AdminUser
 ):
-    return update_user_status(
-        db=db,
-        user_id=user_id,
-        is_active=user_data.is_active,
-        current_admin=admin
+    return APIResponse(
+        success=True,
+        data=update_user_status(
+            db=db,
+            user_id=user_id,
+            is_active=user_data.is_active,
+            current_admin=admin,
+        ),
+        detail="User updated successfully",
     )

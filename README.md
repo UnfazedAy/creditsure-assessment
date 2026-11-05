@@ -4,6 +4,28 @@ CrediSure is a backend-focused assessment project for user authentication,
 administrative user management, and dashboard statistics. It exposes a REST API
 for a dashboard client; it does not include a browser-based frontend.
 
+## Demo Administrator Access
+
+The deployed assessment API and Swagger UI are available at
+[creditsure-assessment-production.up.railway.app/docs](https://creditsure-assessment-production.up.railway.app/docs).
+
+| Item | Assessment demo |
+|---|---|
+| Login endpoint | `POST /api/v1/auth/login` |
+| Email | `admin@credisure.com` |
+| Password | `Password123@` |
+
+In Swagger, submit the email and password to the login endpoint. Copy
+`data.access_token` from the response, click **Authorize**, and paste the token
+into the HTTP Bearer field; Swagger adds the `Bearer` prefix to protected
+requests.
+
+These credentials are exclusively for this assessment. The account has
+administrator permissions over fictional assessment records, but no access to
+Railway infrastructure, secrets, or unrelated systems. Do not reuse the
+password for any real application. Rotate it or disable the account after
+assessment review.
+
 ## Features
 
 - User registration and login with Argon2 password hashing.
@@ -149,7 +171,6 @@ Environment values take precedence. `SECRET_KEY` must be supplied.
 | Variable | Required | Default | Purpose |
 |---|---:|---|---|
 | `APP_NAME` | No | `CrediSure Dashboard API` | FastAPI application title |
-| `DEBUG` | No | `false` | FastAPI debug mode; keep disabled when deployed |
 | `ENVIRONMENT` | No | `development` | Environment name; `production`/`prod` enables seed guard |
 | `DATABASE_URL` | No | `sqlite:///./credisure.db` | SQLAlchemy database URL |
 | `SECRET_KEY` | Yes | — | Secret for signing and validating JWTs |
@@ -164,7 +185,8 @@ Environment values take precedence. `SECRET_KEY` must be supplied.
 
 Set all three `ADMIN_*` values together; partial configuration is rejected.
 Keep deployment secrets in the hosting provider's secret/environment settings,
-not in source control.
+not in source control. FastAPI debug trace responses are disabled so unexpected
+exceptions do not expose stack traces to API clients.
 
 ## Database
 
@@ -230,23 +252,58 @@ All API routes are under `/api/v1`. Authentication uses
 
 `full_name` must be 2-150 characters, `email` must be valid, and `password`
 must be 8-128 characters. Registration returns `201 Created` with the public
-user profile (id, name, email, role, active state, creation time); it does not
-return a password or password hash. Duplicate email returns `409 Conflict`;
-invalid input returns `422 Unprocessable Entity`.
+user profile (id, name, email, role, active state, creation time) inside the
+standard response envelope. It does not return a password or password hash.
+Duplicate email returns `409 Conflict`; invalid input returns `422
+Unprocessable Entity`.
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "d44af641-2708-45ce-8e3f-5e58af40736a",
+    "full_name": "Jordan Lee",
+    "email": "jordan@example.com",
+    "role": "user",
+    "is_active": true,
+    "created_at": "2026-11-05T12:00:00Z"
+  },
+  "detail": "User registered successfully"
+}
+```
+
+All successful operations use `success: true`, a typed result in `data`, and a
+human-readable endpoint-specific `detail`. Errors use `success: false`,
+`data: null`, and a safe `detail`; validation errors can also include field
+errors.
 
 ### Login and profile
 
 `POST /api/v1/auth/login` accepts `{"email":"jordan@example.com",
 "password":"AtLeast8Characters"}`. A successful response (`200 OK`) contains
-`access_token`, `refresh_token`, and `token_type`. Use the access token as a
-bearer token. The access token expires after
+the existing `access_token`, `refresh_token`, and `token_type` under `data`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "access_token": "<generated-access-token>",
+    "refresh_token": "<generated-refresh-token>",
+    "token_type": "bearer"
+  },
+  "detail": "Login successful"
+}
+```
+
+Use the access token as a bearer token. The access token expires after
 `ACCESS_TOKEN_EXPIRE_MINUTES`; the refresh token's configured lifetime is
 `REFRESH_TOKEN_EXPIRE_DAYS`. A refresh endpoint is not implemented.
 
 Invalid credentials return `401 Unauthorized`; an inactive account returns
 `403 Forbidden`. An empty password returns `400`; malformed or missing request
 fields return `422`. `GET /api/v1/auth/me` returns the authenticated profile
-or `401` for missing/invalid credentials and `403` for an inactive account.
+under `data`, with detail `"User retrieved successfully"`, or `401` for
+missing/invalid credentials and `403` for an inactive account.
 
 ### Admin user management
 
@@ -266,14 +323,49 @@ Example:
 GET /api/v1/users?page=2&limit=5&search=jordan&is_active=true&role=user
 ```
 
-The response contains `items`, `total`, `page`, `limit`, `total_pages`,
-`has_next`, and `has_previous`. An item contains the public user profile.
+The pagination fields are inside `data`, which contains `items`, `total`,
+`page`, `limit`, `total_pages`, `has_next`, and `has_previous`. Each item
+contains the public user profile. The outer envelope's detail is
+`"Users retrieved successfully"`.
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [],
+    "total": 0,
+    "page": 1,
+    "limit": 10,
+    "total_pages": 0,
+    "has_next": false,
+    "has_previous": false
+  },
+  "detail": "Users retrieved successfully"
+}
+```
+
 Invalid parameters return `422`. These routes require an active administrator;
 missing/invalid authentication returns `401`, and a regular user's request
 returns `403`.
 
 `GET /api/v1/users/{user_id}` accepts a UUID4 and returns one profile (`200`),
-or `404` when it does not exist. Invalid UUID input returns `422`.
+inside `data` with detail `"User retrieved successfully"`, or `404` when it
+does not exist. Invalid UUID input returns `422`.
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "d44af641-2708-45ce-8e3f-5e58af40736a",
+    "full_name": "Jordan Lee",
+    "email": "jordan@example.com",
+    "role": "user",
+    "is_active": true,
+    "created_at": "2026-11-05T12:00:00Z"
+  },
+  "detail": "User retrieved successfully"
+}
+```
 
 `PATCH /api/v1/users/{user_id}` accepts:
 
@@ -281,9 +373,9 @@ or `404` when it does not exist. Invalid UUID input returns `422`.
 {"is_active": false}
 ```
 
-It returns the updated public profile (`200`). An admin cannot deactivate
-their own account (`400`); a missing user returns `404`, and invalid input
-returns `422`.
+It returns the updated public profile inside `data` (`200`) with detail
+`"User updated successfully"`. An admin cannot deactivate their own account
+(`400`); a missing user returns `404`, and invalid input returns `422`.
 
 ### Dashboard overview
 
@@ -293,10 +385,14 @@ created since the beginning of the current month:
 
 ```json
 {
-  "total_users": 11,
-  "active_users": 8,
-  "inactive_users": 3,
-  "new_users_this_month": 6
+  "success": true,
+  "data": {
+    "total_users": 11,
+    "active_users": 8,
+    "inactive_users": 3,
+    "new_users_this_month": 6
+  },
+  "detail": "Dashboard overview retrieved successfully"
 }
 ```
 
@@ -308,13 +404,31 @@ Counts are illustrative. The endpoint returns `200` for an authorized admin,
 `GET /api/v1/health` is public and returns:
 
 ```json
-{"status": "healthy", "service": "dashboard-api"}
+{
+  "success": true,
+  "data": {"status": "healthy", "service": "dashboard-api"},
+  "detail": "Service is healthy"
+}
 ```
 
-HTTP errors use `{"success": false, "message": ...}`. Request validation
-errors return `422` with `success`, `message`, and field-level `errors`.
-Unhandled exceptions are logged server-side and return a generic `500` message;
-internal exception details are not included in the response.
+HTTP errors use `{"success": false, "data": null, "detail": "..."}`. Request
+validation errors additionally include field-level `errors` containing field
+locations and safe messages, not raw submitted values. Unhandled exceptions are
+logged server-side and return a generic `500` detail; internal exception
+details are not included in the response.
+
+Example validation error:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "detail": "Request validation failed",
+  "errors": [
+    {"field": "body.email", "message": "value is not a valid email address"}
+  ]
+}
+```
 
 Status codes used by the API include `200` for successful reads/updates/login,
 `201` for registration, `400` for attempts to deactivate the current admin,
@@ -331,9 +445,9 @@ type and UUID subject, then load the current user from the database. User
 listing, user lookup/update, and dashboard statistics require the `admin` role.
 There is no public administrator-creation endpoint.
 
-In Swagger UI, use **Authorize** and enter `Bearer <access_token>` (or the
-token in the format requested by the UI). Password hashes are excluded from
-API response schemas.
+In Swagger UI, call login, copy `data.access_token`, select **Authorize**, and
+paste the access token into the HTTP Bearer field. Swagger adds the `Bearer`
+prefix. Password hashes are excluded from API response schemas.
 
 ## Administrator and demo accounts
 
@@ -364,9 +478,11 @@ does not delete users and is not run automatically by the API.
 
 In production (`ENVIRONMENT=production` or `prod`), seeding is refused unless
 `ALLOW_DEMO_SEEDING=true` is explicitly set. Only enable this for an
-assessment deployment that intentionally needs demo accounts. Provide actual
-admin/demo credentials separately through the assessment submission; never
-publish them here.
+assessment deployment that intentionally needs demo accounts. The assessment
+administrator credentials are listed in [Demo Administrator Access](#demo-administrator-access)
+above. This admin can perform account-status updates on the fictional
+assessment data; no read-only reviewer role is implemented. Rotate the
+password or disable the account after review.
 
 ## Testing
 
@@ -409,7 +525,6 @@ In the Railway service's **Variables**, configure at least:
 
 ```text
 SECRET_KEY=<generated secure value>
-DEBUG=false
 ENVIRONMENT=production
 ```
 
@@ -446,7 +561,8 @@ SQLite files out of the image. Configure secrets separately in Railway.
 
 1. Install the pinned dependencies from `requirements.txt`.
 2. Set `SECRET_KEY`, `DATABASE_URL`, and token settings through the platform's
-   environment/secret configuration. Keep `DEBUG=false`.
+   environment/secret configuration. Framework debug trace responses are
+   disabled.
 3. Ensure the selected database is reachable and initialized. The app creates
    missing tables at startup; provisioning scripts also create missing tables.
 4. Create an admin with `python -m app.scripts.create_admin` as a one-off
