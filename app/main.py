@@ -61,3 +61,8 @@ app.include_router(
     users.router,
     prefix="/api/v1",
 )
+
+app.include_router(
+    dashboard.router,
+    prefix="/api/v1"
+)

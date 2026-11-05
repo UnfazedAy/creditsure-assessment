@@ -18,14 +18,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(
     subject: str,
-    expires_delta: timedelta | None,
-    extra_claims: dict[str, Any]
+    expires_delta: timedelta | None = None,
+    extra_claims: dict[str, Any] | None = None,
 ) -> str:
     """Create a JWT access token."""
-    
+    extra_claims = extra_claims or {}
+
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        
+
     expire = datetime.now(timezone.utc) + expires_delta
 
     payload = {
@@ -33,20 +34,22 @@ def create_access_token(
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "access",
-        **extra_claims
+        **extra_claims,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
+
 def create_refresh_token(
     subject: str,
-    expires_delta: timedelta | None,
-    extra_claims: dict[str, Any]
+    expires_delta: timedelta | None = None,
+    extra_claims: dict[str, Any] | None = None,
 ) -> str:
     """Create a JWT refresh token."""
-    
+    extra_claims = extra_claims or {}
+
     if expires_delta is None:
         expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
+
     expire = datetime.now(timezone.utc) + expires_delta
 
     payload = {
@@ -54,7 +57,7 @@ def create_refresh_token(
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "refresh",
-        **extra_claims
+        **extra_claims,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -68,11 +71,15 @@ def decode_token(token: str) -> dict[str, Any]:
     except jwt.InvalidTokenError:
         raise ValueError("Invalid token")
 
-def create_token_pair(subject: str, extra_claims: dict[str, Any]) -> dict[str, str]:
+def create_token_pair(
+    subject: str,
+    extra_claims: dict[str, Any] | None = None,
+) -> dict[str, str]:
     """Create a pair of JWT tokens: access and refresh."""
+    extra_claims = extra_claims or {}
     access_token = create_access_token(subject, None, extra_claims)
     refresh_token = create_refresh_token(subject, None, extra_claims)
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token
+        "refresh_token": refresh_token,
     }
